@@ -67,6 +67,13 @@ func SHA512(p []byte) (sum [64]byte) {
 	return
 }
 
+// Same as SupportsHKDF, as in v1.1.1+
+func SupportsSHA3() bool {
+	return vMajor > 1 ||
+		(vMajor >= 1 && vMinor > 1) ||
+		(vMajor >= 1 && vMinor >= 1 && vFeature >= 1)
+}
+
 func SHA3_224(p []byte) (sum [28]byte) {
 	if !shaX(C.go_openssl_EVP_sha3_224(), p, sum[:]) {
 		panic("openssl: SHA3_224 failed")
@@ -663,146 +670,6 @@ type sha3_512Hash struct {
 func (h *sha3_512Hash) Sum(in []byte) []byte {
 	h.sum(h.out[:])
 	return append(in, h.out[:]...)
-}
-
-// keccakState layout is taken from
-// https://github.com/openssl/openssl/blob/9522f0a6a9c49d650c773f089ed84b0c1ee0368b/include/internal/sha3.h#L34
-type keccakState struct {
-	A [25]uint64
-	// Assumes 64-bit platform, as sadly block_size/md_size/bufsz
-	// are declared as size_t
-	block_size, md_size, bufsz uint64
-	x                          [1600/8 - 32 + 1]byte
-}
-
-const (
-	sha3Magic224        = "sha3\x01"
-	sha3Magic256        = "sha3\x02"
-	sha3Magic384        = "sha3\x03"
-	sha3Magic512        = "sha3\x04"
-	keccakMarshaledSize = len(sha3Magic512) + 25*8 + 3*8 + 168 + 1
-)
-
-func marshalkeccak(magic string, d *keccakState) []byte {
-	b := make([]byte, 0, keccakMarshaledSize)
-	b = append(b, magic...)
-	for i := 0; i < len(d.A); i++ {
-		b = appendUint64(b, d.A[i])
-	}
-	// Maybe not portable across 32/64 bit platforms
-	b = appendUint64(b, d.block_size)
-	b = appendUint64(b, d.md_size)
-	b = appendUint64(b, d.bufsz)
-	// Maybe not portable accross be/le platforms
-	b = append(b, d.x[:]...)
-	// Honestly, only use this across same platforms
-	return b
-}
-
-func unmarshalkeccak(d *keccakState, b []byte) {
-	for i := 0; i < len(d.A); i++ {
-		b, d.A[i] = consumeUint64(b)
-	}
-	b, d.block_size = consumeUint64(b)
-	b, d.md_size = consumeUint64(b)
-	b, d.bufsz = consumeUint64(b)
-	b = b[copy(d.x[:], b):]
-}
-
-func (h *sha3_224Hash) MarshalBinary() ([]byte, error) {
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return nil, errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	return marshalkeccak(sha3Magic224, d), nil
-}
-
-func (h *sha3_224Hash) UnmarshalBinary(b []byte) error {
-	if len(b) < len(sha3Magic224) || string(b[:len(sha3Magic224)]) != sha3Magic224 {
-		return errors.New("crypto/sha3: invalid hash state identifier")
-	}
-	if len(b) != keccakMarshaledSize {
-		return errors.New("crypto/sha3: invalid hash state size")
-	}
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	b = b[len(sha3Magic224):]
-	unmarshalkeccak(d, b)
-	return nil
-}
-
-func (h *sha3_256Hash) MarshalBinary() ([]byte, error) {
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return nil, errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	return marshalkeccak(sha3Magic256, d), nil
-}
-
-func (h *sha3_256Hash) UnmarshalBinary(b []byte) error {
-	if len(b) < len(sha3Magic256) || string(b[:len(sha3Magic256)]) != sha3Magic256 {
-		return errors.New("crypto/sha3: invalid hash state identifier")
-	}
-	if len(b) != keccakMarshaledSize {
-		return errors.New("crypto/sha3: invalid hash state size")
-	}
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	b = b[len(sha3Magic256):]
-	unmarshalkeccak(d, b)
-	return nil
-}
-
-func (h *sha3_384Hash) MarshalBinary() ([]byte, error) {
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return nil, errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	return marshalkeccak(sha3Magic384, d), nil
-}
-
-func (h *sha3_384Hash) UnmarshalBinary(b []byte) error {
-	if len(b) < len(sha3Magic384) || string(b[:len(sha3Magic384)]) != sha3Magic384 {
-		return errors.New("crypto/sha3: invalid hash state identifier")
-	}
-	if len(b) != keccakMarshaledSize {
-		return errors.New("crypto/sha3: invalid hash state size")
-	}
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	b = b[len(sha3Magic384):]
-	unmarshalkeccak(d, b)
-	return nil
-}
-
-func (h *sha3_512Hash) MarshalBinary() ([]byte, error) {
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return nil, errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	return marshalkeccak(sha3Magic512, d), nil
-}
-
-func (h *sha3_512Hash) UnmarshalBinary(b []byte) error {
-	if len(b) < len(sha3Magic512) || string(b[:len(sha3Magic512)]) != sha3Magic512 {
-		return errors.New("crypto/sha3: invalid hash state identifier")
-	}
-	if len(b) != keccakMarshaledSize {
-		return errors.New("crypto/sha3: invalid hash state size")
-	}
-	d := (*keccakState)(h.shaState())
-	if d == nil {
-		return errors.New("crypto/sha3: can't retrieve hash state")
-	}
-	b = b[len(sha3Magic512):]
-	unmarshalkeccak(d, b)
-	return nil
 }
 
 // appendUint64 appends x into b as a big endian byte sequence.

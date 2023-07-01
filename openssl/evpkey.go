@@ -58,22 +58,22 @@ func cryptoHashToMD(ch crypto.Hash) C.GO_EVP_MD_PTR {
 	case crypto.SHA512:
 		return C.go_openssl_EVP_sha512()
 	case crypto.SHA3_224:
-		if vMajor == 1 && (vMinor == 0 || vFeature == 0) {
+		if !SupportsSHA3() {
 			return nil
 		}
 		return C.go_openssl_EVP_sha3_224()
 	case crypto.SHA3_256:
-		if vMajor == 1 && (vMinor == 0 || vFeature == 0) {
+		if !SupportsSHA3() {
 			return nil
 		}
 		return C.go_openssl_EVP_sha3_256()
 	case crypto.SHA3_384:
-		if vMajor == 1 && (vMinor == 0 || vFeature == 0) {
+		if !SupportsSHA3() {
 			return nil
 		}
 		return C.go_openssl_EVP_sha3_384()
 	case crypto.SHA3_512:
-		if vMajor == 1 && (vMinor == 0 || vFeature == 0) {
+		if !SupportsSHA3() {
 			return nil
 		}
 		return C.go_openssl_EVP_sha3_512()

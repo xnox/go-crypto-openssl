@@ -35,7 +35,7 @@ func TestSha(t *testing.T) {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			if strings.HasPrefix(tt.name, "sha3_") && vMajor == 1 && (vMinor == 0 || vFeature == 0) {
+			if strings.HasPrefix(tt.name, "sha3_") && !SupportsSHA3() {
 				t.Skip("crypto/sha3: only supported with openssl-1.1.1+")
 			}
 			h := tt.fn()
@@ -54,16 +54,18 @@ func TestSha(t *testing.T) {
 			if bytes.Equal(sum, initSum) {
 				t.Error("Write didn't change internal hash state")
 			}
-			state, err := h.(encoding.BinaryMarshaler).MarshalBinary()
-			if err != nil {
-				t.Errorf("could not marshal: %v", err)
-			}
-			h2 := tt.fn()
-			if err := h2.(encoding.BinaryUnmarshaler).UnmarshalBinary(state); err != nil {
-				t.Errorf("could not unmarshal: %v", err)
-			}
-			if actual, actual2 := h.Sum(nil), h2.Sum(nil); !bytes.Equal(actual, actual2) {
-				t.Errorf("0x%x != marshaled 0x%x", actual, actual2)
+			if !strings.HasPrefix(tt.name, "sha3_") {
+				state, err := h.(encoding.BinaryMarshaler).MarshalBinary()
+				if err != nil {
+					t.Errorf("could not marshal: %v", err)
+				}
+				h2 := tt.fn()
+				if err := h2.(encoding.BinaryUnmarshaler).UnmarshalBinary(state); err != nil {
+					t.Errorf("could not unmarshal: %v", err)
+				}
+				if actual, actual2 := h.Sum(nil), h2.Sum(nil); !bytes.Equal(actual, actual2) {
+					t.Errorf("0x%x != marshaled 0x%x", actual, actual2)
+				}
 			}
 			h.Reset()
 			sum = h.Sum(nil)
@@ -137,7 +139,7 @@ func TestSHA_OneShot(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if strings.HasPrefix(tt.name, "sha3_") && vMajor == 1 && (vMinor == 0 || vFeature == 0) {
+			if strings.HasPrefix(tt.name, "sha3_") && !SupportsSHA3() {
 				t.Skip("crypto/sha3: only supported with openssl-1.1.1+")
 			}
 			got := tt.oneShot(msg)
